@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+
+<style>
+    body {
+        background-color: #cceeff;
+        text-align: center;
+        margin: 30px;
+    }
+
+    #p1 {
+        background-color: white;
+        box-shadow: 5px 10px 30px 0 rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
+        cursor: crosshair;
+    }
+
+    .left {
+        float: left;
+    }
+
+    .center {
+        float: left;
+    }
+
+    .right {
+        float: left;
+    }
+
+    .layout:after {
+        content: "";
+        display: table;
+        clear: both;
+    }
+</style>
+
+<div class="layout">
+    <div class="left">
+        <label for="brush-size">Brush size</label><input type="range" min="1" max="20" value="5" class="slider" id="brush-size">
+    </div>
+    <div class="center">
+        <canvas id="p1" width="500" height="500"></canvas>
+    </div>
+    <div class="right"><button id="clear">clear</button></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+    const canvas = document.getElementById('p1');
+    const ctx = canvas.getContext('2d');
+    const clearBtn = document.getElementById('clear');
+
+    const gradient = ctx.createLinearGradient(0, 0, canvas.offsetWidth, 0);
+    gradient.addColorStop(0.0, 'magenta');
+    gradient.addColorStop(0.5, 'blue');
+    gradient.addColorStop(1.0, 'red');
+    ctx.strokeStyle = gradient;
+
+    const brushSize = document.getElementById('brush-size');
+    let width = 5;
+    brushSize.onchange = () => {
+        width = brushSize.value;
+    };
+    clearBtn.addEventListener('click', (ev) => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        socket.emit('clear');
+    });
+
+    let lastX = 0;
+    let lastY = 0;
+    canvas.addEventListener('mousedown', event => {
+        lastX = event.offsetX;
+        lastY = event.offsetY;
+    });
+    canvas.addEventListener('mousemove', event => {
+        if (event.buttons) {
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(event.offsetX, event.offsetY);
+            ctx.stroke();
+
+            socket.emit('draw', {
+                fromX: lastX,
+                fromY: lastY,
+                toX: event.offsetX,
+                toY: event.offsetY,
+                width
+            });
+
+            lastX = event.offsetX;
+            lastY = event.offsetY;
+        }
+    });
+    socket.on('clear', (data) => {
+        console.log(data);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+    socket.on('draw', (data) => {
+        ctx.lineWidth = data.width;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(data.fromX, data.fromY);
+        ctx.lineTo(data.toX, data.toY);
+        ctx.stroke();
+    });
+</script>
